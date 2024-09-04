@@ -1,0 +1,8 @@
+  double stack[20]; int head = 0;
+%%
+[\+\-]?[0-9]+(\.[0-9]+)?(([Ee][\+\-])?[0-9]+)? { stack[head++] = atof(yytext); }
+[\-\+\*\/]  { char opp = yytext[0]; double r = stack[--head]; switch (opp) {
+              case '+': stack[head-1] += r; break; case '-': stack[head-1] -= r; break;
+              case '*': stack[head-1] *= r; break; case '/': stack[head-1] /= r; break; }}
+[ \n]       { }
+<<EOF>>     {  printf("%lf", stack[0]); return 0; }
