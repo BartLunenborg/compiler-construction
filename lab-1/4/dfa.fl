@@ -1,0 +1,9 @@
+%%
+  /* DFA 1 */
+(a*bb)*a*ba(a|b)*                             { printf("DFA1 accepted: %s\n", yytext); }
+  /* DFA 2 */
+(a|ab)(ba|(bb)*b)                             { printf("DFA2 accepted: %s\n", yytext); }
+  /* DFA 3 */
+(((aa*b)*(a+c)(db)*da)*|(aa*b)*(a+c)(db)*)    { printf("DFA3 accepted: %s\n", yytext); }
+<<EOF>>                                       { return 0; }
+.|\n                                          { }
