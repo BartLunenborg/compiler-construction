@@ -1,0 +1,5 @@
+%%
+0(0*10+)*\n?    { printf("accepted: %s", yytext); }
+10(0*10+)*\n?   { printf("accepted: %s", yytext); }
+<<EOF>>         { return 0; }
+.*              { printf("rejected: %s", yytext); }
