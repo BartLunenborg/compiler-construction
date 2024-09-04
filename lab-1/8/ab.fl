@@ -1,0 +1,4 @@
+%%
+(a|b(b|ab)*aa)*     { printf("accepted"); }
+<<EOF>>             { return 0; }
+.*                  { printf("rejected"); }
