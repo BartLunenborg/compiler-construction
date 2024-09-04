@@ -1,0 +1,9 @@
+NUM         [0-9]
+LETTER      [a-yA-Y]
+%%
+{NUM}       { printf("%d", (atoi(yytext) + 1) % 10); }
+{LETTER}    { printf("%c", yytext[0] + 1); }
+z           { printf("a"); }
+Z           { printf("A"); }
+<<EOF>>     { return 0; }
+.|\n        { printf("%c", yytext[0]); }
