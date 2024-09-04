@@ -1,0 +1,35 @@
+%{
+int total = 0;
+int prev = 0;
+int sub = 0;
+void update(int num) {
+  if (num < prev) {
+    total += sub;
+    sub = num;
+  } else if (num == prev) {
+    sub += num;
+  } else {
+    sub = num - sub;
+  }
+  prev = num;
+}
+%}
+%%
+I         { printf("I"); update(1); }
+V         { printf("V"); update(5); }
+X         { printf("X"); update(10); }
+L         { printf("L"); update(50); }
+C         { printf("C"); update(100); }
+D         { printf("D"); update(500); }
+M         { printf("M"); update(1000); }
+" "       {
+            printf("=%d\n", total + sub);
+            total = 0;
+            prev = 0;
+            sub = 0;
+          }
+<<EOF>>   { 
+            printf("=%d", total + sub);
+            return 0; 
+          }
+.|\n      { }
