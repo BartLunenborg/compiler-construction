@@ -1,0 +1,16 @@
+%%
+  /* first two a's */
+aabbb+\n?                        { printf("accepted: %s", yytext); }
+  /* last two a's */
+bbb+aa\n?                        { printf("accepted: %s", yytext); }
+  /* a's in the middle */
+bb+aab+\n?                       { printf("accepted: %s", yytext); }
+b+aabb+\n?                       { printf("accepted: %s", yytext); }
+  /* two separate a's */
+b+ab+ab+\n?                      { printf("accepted: %s", yytext); }
+bb+ab+a\n?                       { printf("accepted: %s", yytext); }
+b+abb+a\n?                       { printf("accepted: %s", yytext); }
+abb+ab+\n?                       { printf("accepted: %s", yytext); }
+ab+abb+\n?                       { printf("accepted: %s", yytext); }
+<<EOF>>                          { return 0; }
+.*                               { printf("rejected: %s", yytext); }
