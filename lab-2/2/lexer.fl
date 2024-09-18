@@ -1,0 +1,14 @@
+  #include <stdlib.h>
+  #include "parser.h"
+  int pos = 0;
+%%
+[ \t]     { pos++;                    }
+a         { pos++; return CHAR_A;     }
+\+        { pos++; return PLUS;       }
+\*        { pos++; return TIMES;      }
+\(        { pos++; return PARENL;     }
+\)        { pos++; return PARENR;     }
+\n        { pos++; return NEWLINE;    }
+.         { pos++; return(yytext[0]); }
+<<EOF>>   { return 0;                 }
+%%
