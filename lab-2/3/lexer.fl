@@ -1,0 +1,15 @@
+  #include <stdlib.h>
+  #include "parser.h"
+  int pos = 0;
+%%
+[ \t]     { pos++;                    }
+\(        { pos++; return PARENL;     }
+\)        { pos++; return PARENR;     }
+\{        { pos++; return BRACEL;     }
+\}        { pos++; return BRACER;     }
+\[        { pos++; return BRACKL;     }
+\]        { pos++; return BRACKR;     }
+\n        { pos++; return NEWLINE;    }
+.         { pos++; return(yytext[0]); }
+<<EOF>>   { return 0;                 }
+%%
