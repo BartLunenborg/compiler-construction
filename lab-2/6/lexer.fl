@@ -1,0 +1,19 @@
+  #include <stdlib.h>
+  #include "parser.h"
+white		  [ \t\n]+
+digit		  [0-9]
+integer 	{digit}+
+exponent	[eE][+-]?{integer}
+real		  {integer}("."{integer})?{exponent}?
+
+%%
+{white}   { /* We ignore white space */ }
+{real}		{ return(NUMBER);             }
+"+"		    { return(PLUS);               }
+"-"		    { return(MINUS);              }
+"*"		    { return(TIMES);              }
+"/"		    { return(DIVIDE);             }
+"("		    { return(LEFT_PARENTHESIS);   }
+")"		    { return(RIGHT_PARENTHESIS);  }
+"^"       { return(POWER);              }
+.         { return(yytext[0]);          }
