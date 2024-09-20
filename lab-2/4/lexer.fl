@@ -1,0 +1,12 @@
+  #include <stdlib.h>
+  #include "parser.h"
+%%
+[ \t\n]   { /* ignore white */  }
+a         { return CHAR_A;      }
+b         { return CHAR_B;      }
+d         { return CHAR_D;      }
+e         { return CHAR_E;      }
+f         { return CHAR_F;      }
+.         { return(yytext[0]);  }
+<<EOF>>   { return 0;           }
+%%
