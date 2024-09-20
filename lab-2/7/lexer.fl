@@ -1,0 +1,26 @@
+  #include <stdlib.h>
+  #include "parser.h"
+  int line_number = 1;
+white		  [ \t]+
+digit		  [0-9]
+integer 	{digit}+
+exponent	[eE][+-]?{integer}
+char      [a-z]
+real		  {integer}("."{integer})?{exponent}?
+
+%%
+{white}   { /* We ignore white space */ }
+"\n"      { line_number++;              }
+{real}		{ return(NUMBER);             }
+"+"		    { return(PLUS);               }
+"-"		    { return(MINUS);              }
+"*"		    { return(TIMES);              }
+"/"		    { return(DIVIDE);             }
+"("		    { return(LEFT_PARENTHESIS);   }
+")"		    { return(RIGHT_PARENTHESIS);  }
+"^"       { return(POWER);              }
+"let"     { return(LET);                }
+{char}    { return(VAR);                }
+"="       { return(EQUAL);              }
+";"       { return(SEMICOLON);          }
+.         { return(yytext[0]);          }
