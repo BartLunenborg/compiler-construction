@@ -1,0 +1,11 @@
+  #include <stdlib.h>
+  #include "parser.tab.h"
+  int pos = 0;
+%%
+[ \t\n]   { pos++;                    }
+x         { pos++; return x;          }
+y         { pos++; return y;          }
+z         { pos++; return z;          }
+.         { pos++; return(yytext[0]); }
+<<EOF>>   { return 0;                 }
+%%
