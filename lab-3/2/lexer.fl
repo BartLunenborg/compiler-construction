@@ -1,0 +1,14 @@
+  #include <stdlib.h>
+  #include "parser.tab.h"
+  int pos = 0;
+%%
+[ \t\n]   { pos++;                    }
+\(        { pos++; return RO;          }
+\[        { pos++; return SO;          }
+\{        { pos++; return CO;          }
+\)        { pos++; return RC;          }
+\]        { pos++; return SC;          }
+\}        { pos++; return CC;          }
+.         { pos++; return(yytext[0]); }
+<<EOF>>   { return 0;                 }
+%%
