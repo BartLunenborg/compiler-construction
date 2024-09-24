@@ -1,0 +1,26 @@
+%{
+   #include <stdlib.h>
+
+   #define YYSTYPE double
+   #include "parser.tab.h"
+%}
+
+white                [ \t\n]+
+digit                [0-9]
+integer              {digit}+
+exponent             [eE][+-]?{integer}
+real                 {integer}("."{integer})?{exponent}?
+
+%%
+
+{white}      { /* skip */       }
+
+"+"          { return PLUS;     }
+"-"          { return MINUS;    }
+"*"          { return TIMES;    }
+"/"          { return DIVIDE;   }
+"("          { return LEFTPAR;  }
+")"          { return RIGHTPAR; }
+"^"          { return POWER;    }
+
+{real}       { yylval=atof(yytext);  return NUMBER; }
