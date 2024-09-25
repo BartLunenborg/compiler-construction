@@ -6,58 +6,77 @@
 %}
 %option yylineno
 
-white                [ \t\n]+
-digit                [0-9]
-integer              {digit}+
-exponent             [eE][+-]?{integer}
-real                 {integer}("."{integer})?{exponent}?
-id                   [a-z][a-zA-Z\_0-9]*
+white             [ \t\n]+
+digit             [0-9]
+integer           {digit}+
+exponent          [eE][+-]?{integer}
+real              {integer}("."{integer})?{exponent}?
+id                [a-z][a-zA-Z\_0-9]*
 
 %%
+{white}           { /* skip whitespace */ }
+\{([^\}]|\n)*\}   { /* skip comments   */ }
 
-{white}      { /* skip */       }
-"+"          { return PLUS;     }
-"-"          { return MINUS;    }
-"*"          { return STAR;    }
-"/"          { return SLASH;   }
-"("          { return ROUND_OPEN;  }
-")"          { return ROUND_CLOSE; }
-"["          { return SQUARE_OPEN;  }
-"]"          { return SQUARE_CLOSE; }
-","          { return COMMA;  }
-":"          { return COLON;  }
-";"          { return SEMICOLON;  }
+"+"          { return PLUS;  }
+"-"          { return MINUS; }
+"*"          { return STAR;  }
+"/"          { return SLASH; }
 (?i:div)     { return DIV;   }
 (?i:mod)     { return MOD;   }
+
+"("          { return ROUND_OPEN;   }
+")"          { return ROUND_CLOSE;  }
+"["          { return SQUARE_OPEN;  }
+"]"          { return SQUARE_CLOSE; }
+
+"."          { return DOT;        }
+","          { return COMMA;      }
+":"          { return COLON;      }
+";"          { return SEMICOLON;  }
+
 (?i:begin)   { return BEG; }
 (?i:end)     { return END; }
-\{([^\}]|\n)*\}  { /* comment */ }
-(?i:program){white}{id}    { return PROGRAM_ID; }
-(?i:function){white}{id} { return FUNCTION_ID; }
-(?i:procedure){white}{id} { return PROCEDURE_ID; }
-"."          { return DOT; }
-(?i:var)     { return VAR; }
-(?i:const)   { return CONST; }
-(?i:integer) { return INTEGER; }
-(?i:real)     { return REAL; }
-(?i:if)     { return IF; }
-(?i:then)     { return THEN; }
-(?i:else)     { return ELSE; }
-(?i:while)    { return WHILE; }
-(?i:do)       { return DO;    }
-(?i:array)    { return ARRAY; }
-(?i:of)       { return OF;    }
-{id}         { return ID;     }
-"<"          { return RELOP;     }
-"<="          { return RELOP;     }
-">"          { return RELOP;     }
-">="          { return RELOP;     }
-"="          { return RELOP;     }
-"<>"          { return RELOP;     }
-":="          { return ASSIGN;     }
-{real}       { yylval=atof(yytext);  return NUMBER; }
 
-.             { 
-                printf("Unrecognized character '%c' in line %d.\n", yytext[0], yylineno);
-                exit(0);
-              }
+(?i:program){white}{id}     { return PROGRAM_ID;   }
+(?i:function){white}{id}    { return FUNCTION_ID;  }
+(?i:procedure){white}{id}   { return PROCEDURE_ID; }
+
+(?i:var)      { return VAR;     }
+(?i:const)    { return CONST;   }
+
+(?i:if)       { return IF;      }
+(?i:then)     { return THEN;    }
+(?i:else)     { return ELSE;    }
+(?i:skip)     { return SKIP;    }
+
+(?i:not)      { return NOT;     }
+(?i:and)      { return AND;     }
+(?i:or)       { return OR;      }
+
+(?i:while)    { return WHILE;   }
+(?i:do)       { return DO;      }
+
+(?i:array)    { return ARRAY;   }
+(?i:of)       { return OF;      }
+
+(?i:integer)  { return INTEGER; }
+(?i:real)     { return REAL;    }
+
+(?i:readln)   { return READLN;  }
+(?i:writeln)  { return WRITELN; }
+
+"<"           { return RELOP;   }
+"<="          { return RELOP;   }
+">"           { return RELOP;   }
+">="          { return RELOP;   }
+"="           { return RELOP;   }
+"<>"          { return RELOP;   }
+":="          { return ASSIGN;  }
+
+{real}  { yylval=atof(yytext);  return NUMBER; }
+{id}    { return ID;                           }
+
+.       { /* Abort when a character can not be matched. */
+          printf("Unrecognized character '%c' in line %d.\n", yytext[0], yylineno);
+          exit(0);
+        }

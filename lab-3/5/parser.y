@@ -5,77 +5,89 @@
   #include <math.h>
 
   #define YYSTYPE double
-  #define YYERROR_VERBOSE 1
-  #define YYDEBUG 1
   extern char* yytext;
 
-  extern int yylineno;
+  extern int yylineno;      /* Use the line number option from flex */
   extern int yylex (void);  /* scanner produced by flex */
   int yyerror(char *s);     /* forward declaration */
 %}
 
-%token PROGRAM_ID DOT CONST ID EQUAL NUMBER COLON SEMICOLON
-       SQUARE_OPEN SQUARE_CLOSE ROUND_OPEN ROUND_CLOSE
-       COMMA VAR INTEGER REAL FUNCTION_ID SKIP IF ELSE
-       PROCEDURE_ID OF BEG END ASSIGN WHILE DO
-       THEN NOT AND OR RELOP READLN WRITELN ARRAY
+%token PROGRAM_ID FUNCTION_ID PROCEDURE_ID
+       CONST VAR INTEGER REAL
+       IF THEN ELSE DO WHILE SKIP 
+       BEG END ARRAY OF
+       ASSIGN EQUAL RELOP NOT AND OR
        PLUS MINUS STAR SLASH DIV MOD
-%left OR
-%left AND
+       DOT COMMA COLON SEMICOLON
+       ROUND_OPEN ROUND_CLOSE
+       SQUARE_OPEN SQUARE_CLOSE
+       ID NUMBER READLN WRITELN
+
+%left  OR
+%left  AND
 %right NOT
-%left RELOP
-%left PLUS MINUS
-%left STAR SLASH DIV MOD
+%left  RELOP
+%left  PLUS MINUS
+%left  STAR SLASH DIV MOD
+
 %%
+
 Program         : PROGRAM_ID SEMICOLON
                   ConstDecls
                   VarDecls
                   FuncProcDecls
                   CompoundStatement DOT
                 ;
+
 ConstDecls      : ConstDecls ConstDecl
                 |
                 ;
 ConstDecl       : CONST ID EQUAL NUMBER SEMICOLON
                 ;
+
 VarOptional     : VAR
                 |
                 ;
+
 VarDecls        : VarDecls VarDecl
                 |
                 ;
 VarDecl         : VAR IdentifierList COLON TypeSpec SEMICOLON
                 ;
+
 IdentifierList  : ID IdentifierLists
                 ;
-IdentifierLists :
-                | IdentifierLists COMMA ID
+IdentifierLists : IdentifierLists COMMA ID
+                |
                 ;
+
 TypeSpec        : BasicType
                 | ARRAY SQUARE_OPEN NUMBER DOT DOT NUMBER SQUARE_CLOSE OF BasicType
                 ;
 BasicType       : INTEGER
                 | REAL
                 ;
+
 FuncProcDecls   : FuncProcDecls FuncProcDecl
                 |
                 ;
 FuncProcDecl    : FUNCTION_ID Parameters COLON BasicType SEMICOLON VarDecls CompoundStatement SEMICOLON
                 | PROCEDURE_ID ParametersOptional SEMICOLON VarDecls CompoundStatement SEMICOLON
                 ;
+
 ParametersOptional : Parameters
                    |
                    ;
-Parameters      : ROUND_OPEN ParameterList ROUND_CLOSE
-                ;
-ParameterList   : VarOptional IdentifierList COLON TypeSpec ParameterLists
-                ;
-ParameterLists  :
-                | ParameterLists SEMICOLON VarOptional IdentifierList COLON TypeSpec
-                ;
+Parameters         : ROUND_OPEN ParameterList ROUND_CLOSE
+                   ;
+ParameterList      : VarOptional IdentifierList COLON TypeSpec ParameterLists
+                   ;
+ParameterLists     : ParameterLists SEMICOLON VarOptional IdentifierList COLON TypeSpec
+                   |
+                   ;
 
-CompoundStatement : BEG StatementListOptional END
-                  ;
+CompoundStatement     : BEG StatementListOptional END
+                      ;
 StatementListOptional : StatementList
                       |
                       ;
@@ -100,6 +112,7 @@ Guard           : BoolAtom
                 ;
 BoolAtom        : ArithExpr RELOP ArithExpr
                 ;
+
 LhsList         : Lhs Lhss
                 ;
 Lhss            : Lhss COMMA Lhs
@@ -107,34 +120,36 @@ Lhss            : Lhss COMMA Lhs
                 ;
 Lhs             : ID ArithExprOptional
                 ;
+
 ProcedureCall   : ID ArithExprListOptional
-                | READLN LhsList ROUND_CLOSE
-                | WRITELN ArithExprList ROUND_CLOSE
+                | READLN ROUND_OPEN LhsList ROUND_CLOSE
+                | WRITELN ROUND_OPEN ArithExprList ROUND_CLOSE
                 ;
 
 ArithExprListOptional : ROUND_OPEN ArithExprList ROUND_CLOSE
                       |
                       ;
-ArithExprList   : ArithExpr ArithExprLists
-                ;
-ArithExprLists  : ArithExprLists COMMA ArithExpr
-                |
-                ;
-ArithExpr       : ID ArithExprOptional
-                | NUMBER
-                | ID ROUND_OPEN ArithExprList ROUND_CLOSE
-                | ArithExpr PLUS ArithExpr
-                | ArithExpr MINUS ArithExpr
-                | ArithExpr STAR ArithExpr
-                | ArithExpr SLASH ArithExpr
-                | ArithExpr DIV ArithExpr
-                | ArithExpr MOD ArithExpr
-                | MINUS ArithExpr
-                | ROUND_OPEN ArithExpr ROUND_CLOSE
-                ;
+ArithExprList         : ArithExpr ArithExprLists
+                      ;
+ArithExprLists        : ArithExprLists COMMA ArithExpr
+                      |
+                      ;
+
 ArithExprOptional : SQUARE_OPEN ArithExpr SQUARE_CLOSE
                   | SQUARE_OPEN ArithExpr DOT DOT ArithExpr SQUARE_CLOSE
                   |
+                  ;
+ArithExpr         : ID ArithExprOptional
+                  | NUMBER
+                  | ID ROUND_OPEN ArithExprList ROUND_CLOSE
+                  | ArithExpr PLUS ArithExpr
+                  | ArithExpr MINUS ArithExpr
+                  | ArithExpr STAR ArithExpr
+                  | ArithExpr SLASH ArithExpr
+                  | ArithExpr DIV ArithExpr
+                  | ArithExpr MOD ArithExpr
+                  | MINUS ArithExpr
+                  | ROUND_OPEN ArithExpr ROUND_CLOSE
                   ;
 %%
 
@@ -144,7 +159,6 @@ int yyerror(char *s) {
 }
 
 int main() {
-  //yydebug = 1;
   yyparse();
   printf("ACCEPTED\n");
   return 0;
