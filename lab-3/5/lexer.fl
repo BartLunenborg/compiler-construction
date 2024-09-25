@@ -14,64 +14,64 @@ real              {integer}("."{integer})?{exponent}?
 id                [a-z][a-zA-Z\_0-9]*
 
 %%
-{white}           { /* skip whitespace */ }
-\{([^\}]|\n)*\}   { /* skip comments   */ }
+{white}                     { /* skip whitespace */ }
+\{([^\}]|\n)*\}             { /* skip comments   */ }
 
-"+"          { return PLUS;  }
-"-"          { return MINUS; }
-"*"          { return STAR;  }
-"/"          { return SLASH; }
-(?i:div)     { return DIV;   }
-(?i:mod)     { return MOD;   }
+(?i:program){white}{id}     { return PROGRAM_ID;    }
+(?i:function){white}{id}    { return FUNCTION_ID;   }
+(?i:procedure){white}{id}   { return PROCEDURE_ID;  }
 
-"("          { return ROUND_OPEN;   }
-")"          { return ROUND_CLOSE;  }
-"["          { return SQUARE_OPEN;  }
-"]"          { return SQUARE_CLOSE; }
+"("           { return ROUND_OPEN;   }
+")"           { return ROUND_CLOSE;  }
+"["           { return SQUARE_OPEN;  }
+"]"           { return SQUARE_CLOSE; }
 
-"."          { return DOT;        }
-","          { return COMMA;      }
-":"          { return COLON;      }
-";"          { return SEMICOLON;  }
+"."           { return DOT;          }
+","           { return COMMA;        }
+":"           { return COLON;        }
+";"           { return SEMICOLON;    }
 
-(?i:begin)   { return BEG; }
-(?i:end)     { return END; }
+"+"           { return PLUS;         }
+"-"           { return MINUS;        }
+"*"           { return STAR;         }
+"/"           { return SLASH;        }
+(?i:div)      { return DIV;          }
+(?i:mod)      { return MOD;          }
 
-(?i:program){white}{id}     { return PROGRAM_ID;   }
-(?i:function){white}{id}    { return FUNCTION_ID;  }
-(?i:procedure){white}{id}   { return PROCEDURE_ID; }
+(?i:begin)    { return BEG;          }
+(?i:end)      { return END;          }
 
-(?i:var)      { return VAR;     }
-(?i:const)    { return CONST;   }
+(?i:var)      { return VAR;          }
+(?i:const)    { return CONST;        }
 
-(?i:if)       { return IF;      }
-(?i:then)     { return THEN;    }
-(?i:else)     { return ELSE;    }
-(?i:skip)     { return SKIP;    }
+(?i:if)       { return IF;           }
+(?i:then)     { return THEN;         }
+(?i:else)     { return ELSE;         }
+(?i:skip)     { return SKIP;         }
 
-(?i:not)      { return NOT;     }
-(?i:and)      { return AND;     }
-(?i:or)       { return OR;      }
+(?i:not)      { return NOT;          }
+(?i:and)      { return AND;          }
+(?i:or)       { return OR;           }
 
-(?i:while)    { return WHILE;   }
-(?i:do)       { return DO;      }
+(?i:while)    { return WHILE;        }
+(?i:do)       { return DO;           }
 
-(?i:array)    { return ARRAY;   }
-(?i:of)       { return OF;      }
+(?i:array)    { return ARRAY;        }
+(?i:of)       { return OF;           }
 
-(?i:integer)  { return INTEGER; }
-(?i:real)     { return REAL;    }
+(?i:integer)  { return INTEGER;      }
+(?i:real)     { return REAL;         }
 
-(?i:readln)   { return READLN;  }
-(?i:writeln)  { return WRITELN; }
+(?i:readln)   { return READLN;       }
+(?i:writeln)  { return WRITELN;      }
 
-"<"           { return RELOP;   }
-"<="          { return RELOP;   }
-">"           { return RELOP;   }
-">="          { return RELOP;   }
-"="           { return RELOP;   }
-"<>"          { return RELOP;   }
-":="          { return ASSIGN;  }
+"<"           { return RELOP;        }
+"<="          { return RELOP;        }
+">"           { return RELOP;        }
+">="          { return RELOP;        }
+"="           { return RELOP;        }
+"<>"          { return RELOP;        }
+":="          { return ASSIGN;       }
 
 {real}  { yylval=atof(yytext);  return NUMBER; }
 {id}    { return ID;                           }
