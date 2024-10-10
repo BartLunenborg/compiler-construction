@@ -1,9 +1,9 @@
 %{
 
+  #include "strmap.h"
   #include <stdio.h>
   #include <stdlib.h>
   #include <string.h>
-  #include "strtab.h"
 
   void yyerror(char *msg);    /* forward declaration */
   /* exported by the lexer (made with flex) */
@@ -12,13 +12,129 @@
   extern void showErrorLine();
   extern void initLexer(FILE *f);
   extern void finalizeLexer();
+    
+  ArithExprList **lists = NULL;
+  int listDepth = 0;
 
+
+  int ERRORS = 0;
+  int scope = 0;             // 0 = in global scope, 1 = in local scope
+  HashMap *maps[2];          // maps[0] is the global scope, maps[1] is the local scope
+  char *currentFunc = NULL;  // If declaring a function set the name for easy access
+
+  /*  ==============  ERRORS  ==============  */
+  // Redefinition of an IDENTIFIER error
+  void redefinitionError(char *str) {
+    fprintf(stderr, "Error: redefinition of '%s'!\n", str);
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Using an unknown IDENTIFIER error
+  void undeclaredError(char *str) {
+    fprintf(stderr, "Error: '%s' undeclared, first used in:\n", str);
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Assignment to a CONST variable error
+  void constAssignError(char *str, int type) {
+    fprintf(stderr, "Error: '%s' is declared as '%s', assignment not allowed!\n", str, typeAsString(type));
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Using non-integer types in mod operator
+  void moduloError(int type) {
+    fprintf(stderr, 
+      "Error: trying to use an expression of type '%s' in modulo operator!\n"
+      "'mod' is only defined for integer types.\n", typeAsString(type)
+    );
+    showErrorLine();
+    ERRORS++;
+  }
+  
+  // Trying to use an invalid type in rhs of assignment
+  void invalidRhsError(int type) {
+    fprintf(stderr, "Error: Cannot assign a '%s' to a variable!\n", typeAsString(type));
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Trying to index an array with a non-int
+  void invalidIndexTypeError(int type) {
+    fprintf(stderr, "Error: Cannot index an array with a type '%s'!\n", typeAsString(type));
+    showErrorLine();
+    ERRORS++;
+  } 
+
+  // Trying to use something that has no value
+  void noValueError(int type) {
+    fprintf(stderr, "Error: type '%s' does not have a value and can't be used in this context!\n", typeAsString(type));
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Trying to divide by 0
+  void divisionByZeroError() {
+    fprintf(stderr, "Error: division by zero is not allowed!\n");
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Trying to assign a real to an int
+  void truncationError() {
+    fprintf(stderr, "Error: trying to assign a 'REAL' number to an 'INTEGER' will result in truncation!\n");
+    showErrorLine();
+    ERRORS++;
+  }
+
+  // Trying to call a function with the wrong number of arguments
+  void wrongNumArgumentsError(char *func, int expected, int actual) {
+    fprintf(stderr, "Error: %s expects %d arguments, but was given %d!\n", func, expected, actual);
+    showErrorLine();
+    ERRORS++;
+  }
+
+  void wrongArgumentTypeError(char *func, int i, int expected, int actual) {
+    fprintf(stderr, "Error: argument %d of '%s' should be of type '%s', but got '%s'!\n", i, func, typeAsString(expected), typeAsString(actual));
+    showErrorLine();
+    ERRORS++;
+  }
 %}
 
-%token PROGRAM CONST IDENTIFIER VAR ARRAY RANGE INTNUMBER REALNUMBER OF
+%union {
+  int ival;     /* used for passing int values from lexer to parser    */
+  double dval;  /* used for passing double values from lexer to parser */
+  char* id;     /* used for passing char* values from lexer to parser  */
+  struct {
+    double val;
+    int type;
+    int lower;
+    int upper;
+  } numeric;
+  struct {
+    int type;
+    int array;
+    int lower;
+    int upper;
+  } typeSpec;
+  int type;
+}
+
+%token PROGRAM CONST VAR ARRAY RANGE OF
        FUNCTION PROCEDURE BEGINTOK ENDTOK ASSIGN IF THEN ELSE WHILE DO
        RELOPLT RELOPLEQ RELOPEQ RELOPNEQ RELOPGEQ RELOPGT INTEGER REAL
        AND OR NOT DIV MOD SKIP READLN WRITELN
+
+%token <id>   IDENTIFIER
+%token <ival> INTNUMBER
+%token <dval> REALNUMBER
+
+%type <numeric>    NumericValue ArithExpr Lhs
+%type <type>       BasicType
+%type <typeSpec>   TypeSpec
+%type <id>         IdentifierList
 
 %left '+' '-'
 %left '*' '/' DIV MOD
@@ -26,57 +142,98 @@
 %left AND
 %left NOT
 
-%union {
-  int ival;     /* used for passing int values from lexer to parser */
-  double dval;  /* used for passing double values from lexer to parser */
-  /* add here anything you may need */
-  /*....*/
-}
-
-
 %%
 
-program            : PROGRAM IDENTIFIER ';'
-                     ConstDecl
+program            : PROGRAM IDENTIFIER { free($2); } ';'
+                     ConstDecl 
                      VarDecl
                      FuncProcDecl
                      CompoundStatement
                      '.'
                    ;
 
-ConstDecl          : ConstDecl CONST IDENTIFIER RELOPEQ NumericValue ';'
+ConstDecl          : ConstDecl CONST IDENTIFIER RELOPEQ NumericValue ';' {
+                      if (lookupStringTable(maps[scope], $3) == -1) {  // new CONST
+                        int idx = insertOrRetrieveStringTable(maps[scope], $3);
+                        setType(maps[scope], idx, $5.type);
+                        setVal(maps[scope], idx, $5.val);
+                      } else {  // Duplicate CONST
+                        redefinitionError($3);
+                      }
+                      free($3);
+                     }
                    | %empty
                    ;
 
-NumericValue       : INTNUMBER
-                   | REALNUMBER
+NumericValue       : INTNUMBER   { $$.val = $1; $$.type = INTCON;  }
+                   | REALNUMBER  { $$.val = $1; $$.type = REALCON; }
                    ;
 
-VarDecl            : VarDecl VAR IdentifierList ':' TypeSpec ';'
+VarDecl            : VarDecl VAR IdentifierList ':' TypeSpec ';' {
+                      if ($5.array) {
+                        assignArrayTypes(maps[scope], $5.type, $5.lower, $5.upper);
+                      } else {
+                        assignTypes(maps[scope], $5.type);
+                      }
+                     }
                    | %empty
                    ;
 
-IdentifierList     : IDENTIFIER
-                   | IdentifierList ',' IDENTIFIER
+IdentifierList     : IDENTIFIER {
+                      if (lookupStringTable(maps[scope], $1) == -1) {
+                        insertOrRetrieveStringTable(maps[scope], $1);
+                      } else {
+                        redefinitionError($1);  // Duplicate Identifier
+                      }
+                      free($1);
+                     }
+                   | IdentifierList ',' IDENTIFIER {
+                      if (lookupStringTable(maps[scope], $3) == -1) {
+                        insertOrRetrieveStringTable(maps[scope], $3);
+                      } else {
+                        redefinitionError($3);  // Duplicate Identifier
+                      }
+                      free($3);
+                     }
                    ;
 
-TypeSpec           : BasicType
-                   | ARRAY '[' INTNUMBER RANGE INTNUMBER ']' OF BasicType
+TypeSpec           : BasicType  { $$.type = $1; $$.array = 0; }
+                   | ARRAY '[' INTNUMBER RANGE INTNUMBER ']' OF BasicType {
+                      $$.type = $8; $$.array = 1; $$.lower = $3; $$.upper = $5;
+                     }
                    ;
 
-BasicType          : INTEGER
-                   | REAL
+BasicType          : INTEGER  { $$ = INTNUM;  }
+                   | REAL     { $$ = REALNUM; }
                    ;
 
 FuncProcDecl       : FuncProcDecl SubProgDecl ';'
                    | %empty
                    ;
 
-SubProgDecl        : SubProgHeading VarDecl CompoundStatement
+SubProgDecl        : { maps[++scope] = newStringTable(); } SubProgHeading VarDecl CompoundStatement { freeStringTable(maps[scope]); maps[scope--] = NULL; }
                    ;
 
-SubProgHeading     : FUNCTION IDENTIFIER Parameters ':' BasicType ';'
-                   | PROCEDURE IDENTIFIER PossibleParameters ';'
+SubProgHeading     : FUNCTION IDENTIFIER { 
+                      currentFunc = $2; 
+                      if (lookupStringTable(maps[0], currentFunc) == -1) {
+                        insertOrRetrieveStringTable(maps[0], currentFunc); 
+                      } else {
+                        redefinitionError(currentFunc);
+                      }
+                     } Parameters ':' BasicType ';' { 
+                      setType(maps[0], lookupStringTable(maps[0], currentFunc), ($6 == INTNUM ? FUNCI : FUNCR));
+                      free(currentFunc); currentFunc = NULL;
+                     }
+                   | PROCEDURE IDENTIFIER {
+                      currentFunc = $2;
+                      if (lookupStringTable(maps[0], currentFunc) == -1) {
+                        int idx = insertOrRetrieveStringTable(maps[0], currentFunc);
+                        setType(maps[0], idx, PROC);
+                      } else {
+                        redefinitionError(currentFunc);
+                      }
+                     } PossibleParameters ';' { free(currentFunc); currentFunc = NULL; }
                    ;
 
 PossibleParameters : Parameters
@@ -90,8 +247,26 @@ ParameterList      : ParamList
                    | ParameterList ';' ParamList
                    ;
 
-ParamList          : VAR IdentifierList ':' TypeSpec
-                   | IdentifierList ':' TypeSpec
+ParamList          : VAR IdentifierList ':' TypeSpec {
+                      int vars = 0; int type = $4.type;
+                      if ($4.array) {
+                        vars = assignArrayTypes(maps[scope], $4.type, $4.lower, $4.upper);
+                        type = $4.type == REALNUM ? ARROR : ARROI;
+                      } else {
+                        vars = assignTypes(maps[scope], $4.type);
+                      }
+                      addParams(maps[0], currentFunc, vars, type, $4.lower, $4.upper, 1);
+                     }
+                   | IdentifierList ':' TypeSpec {
+                      int vars = 0; int type = $3.type;
+                      if ($3.array) {
+                        vars = assignArrayTypes(maps[scope], $3.type, $3.lower, $3.upper);
+                        type = $3.type == REALNUM ? ARROR : ARROI;
+                      } else {
+                        vars = assignTypes(maps[scope], $3.type);
+                      }
+                      addParams(maps[0], currentFunc, vars, type, $3.lower, $3.upper, 0);
+                     }
                    ;
 
 CompoundStatement  : BEGINTOK OptionalStatements ENDTOK
@@ -105,7 +280,14 @@ StatementList      : Statement
                    | StatementList ';' Statement
                    ;
 
-Statement          : Lhs ASSIGN ArithExpr
+Statement          : Lhs ASSIGN ArithExpr { 
+                      if (!typeCanBeRhs($3.type)) {
+                        invalidRhsError($3.type); 
+                      }
+                      if (isIntegerType($1.type) && isRealType($3.type)) {
+                        truncationError();
+                      }
+                     }
                    | SKIP
                    | ProcedureCall
                    | CompoundStatement
@@ -116,14 +298,56 @@ Statement          : Lhs ASSIGN ArithExpr
 LhsList            : Lhs
                    | LhsList ',' Lhs
 
-Lhs                : IDENTIFIER
-                   | IDENTIFIER '[' ArithExpr ']'
+Lhs                : IDENTIFIER {
+                      int idx = lookupStringTable(maps[scope], $1);
+                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                        undeclaredError($1);
+                      } else {
+                        int scopeFound = idx == -1 ? 0 : scope;
+                        idx = lookupStringTable(maps[scopeFound], $1);
+                        if (isConstantType(maps[scopeFound], idx)) {
+                          constAssignError($1, typeFromIdx(maps[scopeFound], idx));
+                        }
+                        $$.type = typeFromIdx(maps[scopeFound], idx);
+                      }
+                      free($1);
+                     }
+                   | IDENTIFIER '[' ArithExpr ']' {
+                      int idx = lookupStringTable(maps[scope], $1);
+                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                        undeclaredError($1);
+                      } else {
+                        int scopeFound = idx == -1 ? 0 : scope;
+                        idx = lookupStringTable(maps[scopeFound], $1);
+                        if (isConstantType(maps[scopeFound], idx)) {
+                          constAssignError($1, typeFromIdx(maps[scopeFound], idx));
+                        } 
+                        $$.type = typeFromIdx(maps[scopeFound], idx);
+                      }
+                      if (!isIntegerType($3.type)) {
+                        invalidIndexTypeError($3.type);
+                      }
+                      free($1);
+                     }
                    ;
 
-ProcedureCall      : IDENTIFIER
-                   | IDENTIFIER '(' ArithExprList ')'
+ProcedureCall      : IDENTIFIER {
+                      if (lookupStringTable(maps[0], $1) == -1) {
+                        undeclaredError($1);
+                      }
+                      free($1);
+                     }
+                   | IDENTIFIER { lists = addList(lists, ++listDepth); } '(' ArithExprList ')' {
+                      if (lookupStringTable(maps[0], $1) == -1) {
+                        undeclaredError($1);
+                      }
+                      lists = freeList(lists, --listDepth);
+                      free($1);
+                     }
                    | READLN '(' LhsList ')'
-                   | WRITELN '(' ArithExprList ')'
+                   | WRITELN { lists = addList(lists, ++listDepth); } '(' ArithExprList ')' { 
+                      lists = freeList(lists, --listDepth);
+                     }
                    ;
 
 Guard              : BoolAtom
@@ -144,24 +368,127 @@ Relop              : RELOPLT
                    | RELOPGT
                    ;
 
-ArithExprList      : ArithExpr
-                   | ArithExprList ',' ArithExpr
+ArithExprList      : ArithExpr  { addArithExpr(lists, listDepth-1, $1.type, $1.val, $1.lower, $1.upper); }
+                   | ArithExprList ',' ArithExpr { addArithExpr(lists, listDepth-1, $3.type, $3.val, $3.lower, $3.upper); }
                    ;
 
-ArithExpr          : IDENTIFIER
-                   | IDENTIFIER '[' ArithExpr ']'
-                   | IDENTIFIER '[' ArithExpr RANGE ArithExpr ']'
-                   | IDENTIFIER '(' ArithExprList ')'
-                   | INTNUMBER
-                   | REALNUMBER
-                   | ArithExpr '+' ArithExpr
-                   | ArithExpr '-' ArithExpr
-                   | ArithExpr '*' ArithExpr
-                   | ArithExpr '/' ArithExpr
-                   | ArithExpr DIV ArithExpr
-                   | ArithExpr MOD ArithExpr
-                   | '-' ArithExpr
-                   | '(' ArithExpr ')'
+ArithExpr          : IDENTIFIER {
+                      int idx = lookupStringTable(maps[scope], $1);
+                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                        undeclaredError($1);
+                      } else {
+                        int scopeFound = idx == -1 ? 0 : scope;
+                        $$.type = typeFromStr(maps[scopeFound], $1); $$.val = -1;  // TODO: Set $$.val correctly?
+                      }
+                      free($1);
+                     }
+                   | IDENTIFIER '[' ArithExpr ']' {
+                      int idx = lookupStringTable(maps[scope], $1);
+                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                        undeclaredError($1);
+                      } else if (!isIntegerType($3.type)) {
+                        invalidIndexTypeError($3.type);
+                      } else {
+                        int scopeFound = idx == -1 ? 0 : scope;
+                        $$.type = typeFromArr(typeFromStr(maps[scopeFound], $1)); $$.val = -1;  // TODO: Set $$.val correctly?
+                      }
+                      free($1);
+                     }
+                   | IDENTIFIER '[' ArithExpr RANGE ArithExpr ']' {
+                      int idx = lookupStringTable(maps[scope], $1);
+                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                        undeclaredError($1);
+                      } else if (!isIntegerType($3.type)) {
+                        invalidIndexTypeError($3.type);
+                      } else if (!isIntegerType($5.type)) {
+                        invalidIndexTypeError($5.type);
+                      } else {  // TODO: Check range and set $$.type 'correctly'
+                        int scopeFound = idx == -1 ? 0 : scope;
+                        $$.type = typeFromStr(maps[scopeFound], $1); $$.val = -1;  // TODO: Set $$.val correctly?
+                      }
+                      free($1);
+                     }
+                   | IDENTIFIER { lists = addList(lists, ++listDepth); } '(' ArithExprList ')' {
+                      int idx = lookupStringTable(maps[scope], $1);
+                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                        undeclaredError($1);
+                      } else {
+                        int scopeFound = idx == -1 ? 0 : scope;
+                        int expected = expectedNumArguments(maps[scopeFound], $1);
+                        if (expected != lists[listDepth-1]->len) {
+                          wrongNumArgumentsError($1, expected, lists[listDepth-1]->len);
+                        }
+                        idx = lookupStringTable(maps[scopeFound], $1);
+                        for (int i = 0; i < expected; i++) {
+                          int expectedType = maps[scopeFound]->symbols[idx].params[i].type;
+                          int actualType = lists[listDepth-1]->items[i].type;
+                          if (!isValidParamType(maps[scopeFound]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
+                            wrongArgumentTypeError($1, i, expectedType, actualType);
+                          }
+                          int isRef = maps[scopeFound]->symbols[idx].params[i].ref;
+                        }
+                        $$.type = typeFromStr(maps[scopeFound], $1); $$.val = -1;  // TODO: Set $$.val correctly?
+                      }
+                      lists = freeList(lists, --listDepth);
+                      free($1);
+                     }
+                   | INTNUMBER   { $$.type = INTNUM;  $$.val = $1; }
+                   | REALNUMBER  { $$.type = REALNUM; $$.val = $1; }
+                   | ArithExpr '+' ArithExpr  {
+                      if (!typeCanBeRhs($1.type)) {
+                        noValueError($1.type);
+                      } else if (!typeCanBeRhs($3.type)) {
+                        noValueError($1.type);
+                      }
+                      $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM; $$.val = -1;
+                     }
+                   | ArithExpr '-' ArithExpr  {
+                      if (!typeCanBeRhs($1.type)) {
+                        noValueError($1.type);
+                      } else if (!typeCanBeRhs($3.type)) {
+                        noValueError($1.type);
+                      }
+                      $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM; $$.val = -1;
+                     }
+                   | ArithExpr '*' ArithExpr  {
+                      if (!typeCanBeRhs($1.type)) {
+                        noValueError($1.type);
+                      } else if (!typeCanBeRhs($3.type)) {
+                        noValueError($1.type);
+                      }
+                      $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM; $$.val = -1;
+                     }
+                   | ArithExpr '/' ArithExpr  {  // '/' always returns a real
+                      if (!typeCanBeRhs($1.type)) {
+                        noValueError($1.type);
+                      } else if (!typeCanBeRhs($3.type)) {
+                        noValueError($3.type);
+                      } else if ($3.val == 0) {
+                        divisionByZeroError();
+                      }
+                      $$.type = REALNUM; $$.val = -1;
+                     }
+                   | ArithExpr DIV ArithExpr  {  // Integer division returns an int
+                      if (!typeCanBeRhs($1.type)) {
+                        noValueError($1.type);
+                      } else if (!typeCanBeRhs($3.type)) {
+                        noValueError($3.type);
+                      } else if ($3.val == 0) {
+                        divisionByZeroError();
+                      }
+                      $$.type = INTNUM; $$.val = -1;
+                     }
+                   | ArithExpr MOD ArithExpr  {  // Only defined for integer types
+                      if (!isIntegerType($1.type)) {
+                        moduloError($1.type);
+                      }
+                      if (!isIntegerType($3.type)) {
+                        moduloError($3.type);
+                      }
+                      $$.type = INTNUM; $$.val = -1;  // TODO: Set $$.val correctly?
+                     }
+                   | '-' ArithExpr      { $$.type = $2.type; $$.val = -$2.val; }
+                   | '(' ArithExpr ')'  { $$.type = $2.type; $$.val = $2.val; }
                    ;
 
 %%
@@ -213,6 +540,10 @@ void yyerror (char *msg) {
   fprintf(stderr, ").\n");
 
   printf("ERRORS: 1\nREJECTED\n");
+  freeStringTable(maps[0]);
+  if (maps[1]) {
+    freeStringTable(maps[1]);
+  }
   exit(EXIT_SUCCESS);  /* EXIT_SUCCESS because we use Themis */
 }
 
@@ -228,18 +559,26 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  maps[0] = newStringTable();
+  maps[1] = NULL;
   initLexer(input);
   int result = yyparse();
   finalizeLexer();
 
 #if 0
-  showStringTable();
+  showStringTable(maps[0]);
 #endif
 
-  printf("ERRORS: %d\n", 0);
-  puts(result == 0 ? "ACCEPTED" : "REJECTED");
+  printf("ERRORS: %d\n", ERRORS);
+  puts(ERRORS == 0 ? "ACCEPTED" : "REJECTED");
 
   fclose(input);
+
+  freeStringTable(maps[0]);
+  if (maps[1]) {
+    freeStringTable(maps[1]);
+  }
+  free(lists);
 
   return EXIT_SUCCESS;
 }

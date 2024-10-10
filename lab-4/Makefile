@@ -1,18 +1,18 @@
-all: parser lexer strtab
-	gcc -o minipas -O2 parser.o lexer.o strtab.o -lfl -lm
+all: parser lexer strmap
+	gcc -o minipas -O2 parser.o lexer.o strmap.o -lfl -lm -g
 
 parser: parser.y
 	bison -d parser.y
 	mv parser.tab.c parser.c
-	gcc -O2 -c parser.c
+	gcc -O2 -c parser.c -g
 
 lexer: lexer.fl
 	flex lexer.fl
 	mv lex.yy.c lexer.c
-	gcc -O2 -c lexer.c
+	gcc -O2 -c lexer.c -g
 
-strtab: strtab.c strtab.h
-	gcc -O2 -c strtab.c
+strmap: strmap.c strmap.h
+	gcc -O2 -c strmap.c -g
 
 clean:
 	rm -f *~
