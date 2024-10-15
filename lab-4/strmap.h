@@ -126,6 +126,12 @@ void setVal(HashMap *map, int idx, double val);
 
 int assignArrayTypes(HashMap *map, Type type, int lower, int upper);
 
+int isArrayType(HashMap *map, int idx);
+
+int canBeLhs(HashMap *map, int idx, int scope);
+
+int isFuncType(HashMap *map, int idx);
+
 int assignTypes(HashMap *map, Type type);
 
 void addParams(HashMap *map, char *func, int vars, Type type, int lower, int upper, int ref);
@@ -136,7 +142,17 @@ ArithExprList **addList(ArithExprList **list, int len);
 
 ArithExprList **freeList(ArithExprList **list, int len);
 
-int isValidParamType(Param a, ArithExprItem b);
+int isValidParamType(Param e, ArithExprItem a);
+
+int typeGetsTruncated(Param e, ArithExprItem a);
+
+int isValidArraySlice(Param e, ArithExprItem a);
+
+int isInRange(HashMap *map, int idx, int i);
+
+void copyToLocalScope(HashMap *global, HashMap *local, char *str);
+
+const char *arrBoundsAsString(HashMap *map, int idx);
 
 void showList(ArithExprItem *list, int size);
 

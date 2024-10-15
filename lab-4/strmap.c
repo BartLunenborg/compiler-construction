@@ -83,9 +83,28 @@ int insertOrRetrieveStringTable(HashMap *map, char *str) {
   return idx;
 }
 
+void copyToLocalScope(HashMap *global, HashMap *local, char *str) {
+  int gIdx = lookupStringTable(global, str);
+  int lIdx = insertOrRetrieveStringTable(local, str);
+  local->symbols[lIdx].type = global->symbols[gIdx].type;
+  local->symbols[lIdx].lower = global->symbols[gIdx].lower;
+  local->symbols[lIdx].upper = global->symbols[gIdx].upper;
+  local->symbols[lIdx].ival = global->symbols[gIdx].ival;
+  local->symbols[lIdx].dval = global->symbols[gIdx].dval;
+  int numParams = global->symbols[gIdx].numParams;
+  local->symbols[lIdx].numParams = numParams;
+  local->symbols[lIdx].params = calloc(numParams, sizeof(Param));
+  for (int i = 0; i < numParams; i++) {
+    local->symbols[lIdx].params[i].type = global->symbols[gIdx].params[i].type;
+    local->symbols[lIdx].params[i].lower = global->symbols[gIdx].params[i].lower;
+    local->symbols[lIdx].params[i].upper = global->symbols[gIdx].params[i].upper;
+    local->symbols[lIdx].params[i].ref = global->symbols[gIdx].params[i].ref;
+  }
+}
+
 int expectedNumArguments(HashMap *map, char *str) {
   int idx = lookupStringTable(map, str);
-  return map->symbols[idx].numParams;
+  return idx > -1 ? map->symbols[idx].numParams : idx;
 }
 
 void setType(HashMap *map, int idx, Type type) {
@@ -117,6 +136,20 @@ int typeFromArr(Type t) {
   return t == ARROI ? INTNUM : REALNUM;
 }
 
+int isInRange(HashMap *map, int idx, int i) {
+  int lower = map->symbols[idx].lower;
+  int upper = map->symbols[idx].upper;
+  return lower <= i && i <= upper;
+}
+
+const char *arrBoundsAsString(HashMap *map, int idx) {
+  static char buffer[100];
+  int lower = map->symbols[idx].lower;
+  int upper = map->symbols[idx].upper;
+  snprintf(buffer, sizeof(buffer), "[%d..%d]", lower, upper);
+  return buffer;
+}
+
 char *typeAsString(Type type) {
   switch (type) {
     case NONE:    return "NONE"; break;
@@ -142,6 +175,25 @@ void setVal(HashMap *map, int idx, double val) {
   } else {
     map->symbols[idx].dval = val;
   }
+}
+
+int isArrayType(HashMap *map, int idx) {
+  Type type = map->symbols[idx].type;
+  return type == ARROR || type == ARROI;
+}
+
+int canBeLhs(HashMap *map, int idx, int scope) {
+  int type = map->symbols[idx].type;
+  if (scope == 0) {
+    return type == REALNUM || type == INTNUM;
+  } else {
+    return type == REALNUM || type == INTNUM || type == FUNCI || type == FUNCR;
+  }
+}
+
+int isFuncType(HashMap *map, int idx) {
+  Type type = map->symbols[idx].type;
+  return type == FUNCI || type == FUNCR || type == PROC;
 }
 
 int assignArrayTypes(HashMap *map, Type type, int lower, int upper) {
@@ -171,9 +223,9 @@ int assignTypes(HashMap *map, Type type) {
 
 // e: expected, a: actual
 int isValidParamType(Param e, ArithExprItem a) {
-  if (e.type == a.type || 
-      isIntegerType(e.type) && isIntegerType(a.type) ||
-      isRealType(e.type) && isRealType(a.type)
+  if ((e.type == a.type) || 
+      (isIntegerType(e.type) && isIntegerType(a.type)) ||
+      (isRealType(e.type) && isRealType(a.type))
     ) {  // Obvious case
     return 1;
   }
@@ -183,6 +235,25 @@ int isValidParamType(Param e, ArithExprItem a) {
   }
   if (e.type == ARROR && a.type == ARROI) {  // Array promotion
     return 1;  // Check for size elsewhere
+  }
+  return 0;
+}
+
+// e: expected, a: actual
+int typeGetsTruncated(Param e, ArithExprItem a) {
+  if (isIntegerType(e.type) && isRealType(a.type)) {
+    return 1;
+  }
+  return e.type == ARROI && a.type == ARROR;  // array truncation
+}
+
+// e: expected, a: actual
+int isValidArraySlice(Param e, ArithExprItem a) {
+  if (!(e.type == ARROI || e.type == ARROR) && !(a.type == ARROI || a.type == ARROR)) {
+    return 1;  // we are not dealing with arrays
+  }
+  if (a.upper - a.lower == e.upper - e.lower) {
+    return 1;  // we already check that we stay inbound elsewhere
   }
   return 0;
 }
@@ -228,8 +299,7 @@ ArithExprList **freeList(ArithExprList **lists, int len) {
 void addArithExpr(ArithExprList **lists, int idx, Type type, double val, int lower, int upper) {
   lists[idx]->len++;
   lists[idx]->items = realloc(lists[idx]->items, lists[idx]->len * sizeof(ArithExprItem));
-  if (isIntegerType(type)) {
-    lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, (int)val, 0, lower, upper}; 
+  if (isIntegerType(type)) { lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, (int)val, 0, lower, upper}; 
   } else {
     lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, 0, val, lower, upper}; 
   }
