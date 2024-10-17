@@ -64,5 +64,7 @@ The errors are implemented such that the program will always continue parsing un
     - When a raw number is passed by reference we give an error (things such as `a * b` or `arr[5] + 9`).
 26. Return value ignored
     - When a functions is called but the result is not used (function used as procedure).
+17. Function shadowed error
+    - When we have defined a function and we try to call it in another function, but it is shadowed by a local variable.
 
 [^1]: Integer types are integer numbers, but also functions return integers and arrays of integers if one element is selected.

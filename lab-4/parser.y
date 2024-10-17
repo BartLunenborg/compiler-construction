@@ -559,6 +559,15 @@ ArithExpr          : IDENTIFIER {
                       } else {
                         int scopeFound = idx == -1 ? 0 : scope;
                         idx = lookupStringTable(maps[scopeFound], $1);
+                        if (isFuncType(maps[scopeFound], idx)) {
+                          if (scope == 1 && lookupStringTable(maps[1], $1) > -1 && !isFuncType(maps[1], lookupStringTable(maps[1], $1))) {
+                            funcShadowedError($1);
+                          } else if (typeFromIdx(maps[scopeFound], idx) != PROC) {
+                            invalidProcCallError(typeFromIdx(maps[scopeFound], idx));
+                          } else if (expectedNumArguments(maps[scopeFound], $1) != 0) {
+                            wrongNumArgumentsError($1, expectedNumArguments(maps[scopeFound], $1), 0);
+                          }
+                        }
                         $$.type = typeFromStr(maps[scopeFound], $1);
                         $$.lower = maps[scopeFound]->symbols[idx].lower; $$.upper = maps[scopeFound]->symbols[idx].upper;
                         $$.val = -1;
@@ -619,37 +628,42 @@ ArithExpr          : IDENTIFIER {
                       free($1);
                      }
                    | IDENTIFIER { lists = addList(lists, ++listDepth); } '(' ArithExprList ')' {
-                      int idx = lookupStringTable(maps[scope], $1);
+                      int idx = lookupStringTable(maps[0], $1);
                       $$.valKnown = 0;
-                      if (idx == -1 && (scope != 1 || lookupStringTable(maps[0], $1) == -1)) {
+                      int expected = expectedNumArguments(maps[0], $1);
+                      if (idx == -1) {
                         undeclaredError($1);
+                      } else if (scope == 1 && lookupStringTable(maps[1], $1) > -1 && !isFuncType(maps[1], lookupStringTable(maps[1], $1))) {
+                        funcShadowedError($1);
+                      } else if (!isFuncType(maps[0], idx)) {
+                        invalidFuncCallError(typeFromIdx(maps[0], idx));
+                      } else if (expected != lists[listDepth-1]->len) {
+                          wrongNumArgumentsError($1, expected, lists[listDepth-1]->len);
                       } else {
-                        int scopeFound = idx == -1 ? 0 : scope;
-                        int expected = expectedNumArguments(maps[scopeFound], $1);
                         if (expected != lists[listDepth-1]->len) {
                           wrongNumArgumentsError($1, expected, lists[listDepth-1]->len);
                         } else {
-                          idx = lookupStringTable(maps[scopeFound], $1);
+                          idx = lookupStringTable(maps[0], $1);
                           for (int i = 0; i < expected; i++) {
-                            int expectedType = maps[scopeFound]->symbols[idx].params[i].type;
+                            int expectedType = maps[0]->symbols[idx].params[i].type;
                             int actualType = lists[listDepth-1]->items[i].type;
-                            if (!isValidParamType(maps[scopeFound]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
-                              if (typeGetsTruncated(maps[scopeFound]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
+                            if (!isValidParamType(maps[0]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
+                              if (typeGetsTruncated(maps[0]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
                                 truncationError();
                               } else { wrongArgumentTypeError($1, i, expectedType, actualType); }
-                            } else if (!isValidArraySlice(maps[scopeFound]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
-                              Param e = maps[scopeFound]->symbols[idx].params[i];
+                            } else if (!isValidArraySlice(maps[0]->symbols[idx].params[i], lists[listDepth-1]->items[i])) {
+                              Param e = maps[0]->symbols[idx].params[i];
                               ArithExprItem a = lists[listDepth-1]->items[i];
                               wrongRangeError($1, i, e.lower, e.upper, a.lower, a.upper);
                             }
-                            if (maps[scopeFound]->symbols[idx].params[i].ref) {
+                            if (maps[0]->symbols[idx].params[i].ref) {
                               if (actualType == REALCON || actualType == INTCON) { constAsRefError();  }
                               if (actualType == FUNCI   || actualType == FUNCR)  { funcAsRefError();   }
                               if (lists[listDepth-1]->items[i].rawNum)           { rawNumAsRefError(); }
                             }
                           }
                         }
-                        $$.type = typeFromStr(maps[scopeFound], $1);
+                        $$.type = typeFromStr(maps[0], $1);
                       }
                       lists = freeList(lists, --listDepth);
                       free($1);
