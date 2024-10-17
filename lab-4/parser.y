@@ -31,13 +31,19 @@
   }
 
   void constAsRefError() {
-    fprintf(stderr, "Error: trying to pass a 'const' variable as reference!\n");
+    fprintf(stderr, "Error: trying to pass a 'const' variable by reference!\n");
     showErrorLine();
     ERRORS++;
   }
   
   void funcAsRefError() {
-    fprintf(stderr, "Error: trying to pass a function as reference!\n");
+    fprintf(stderr, "Error: trying to pass a function by reference!\n");
+    showErrorLine();
+    ERRORS++;
+  } 
+
+  void rawNumAsRefError() {
+    fprintf(stderr, "Error: trying to pass a number by reference!\n");
     showErrorLine();
     ERRORS++;
   }
@@ -214,6 +220,7 @@
     int lower;
     int upper;
     int valKnown;
+    int rawNum;
   } numeric;
   struct {
     int type;
@@ -493,9 +500,11 @@ ProcedureCall      : IDENTIFIER {
                             ArithExprItem a = lists[listDepth-1]->items[i];
                             wrongRangeError($1, i, e.lower, e.upper, a.lower, a.upper);
                           }
-                          int isRef = maps[0]->symbols[idx].params[i].ref;
-                          if (isRef && (actualType == REALCON || actualType == INTCON)) { constAsRefError(); }
-                          if (isRef && (actualType == FUNCI || actualType == FUNCR)) { funcAsRefError(); }
+                          if (maps[0]->symbols[idx].params[i].ref) {
+                            if (actualType == REALCON || actualType == INTCON) { constAsRefError();  }
+                            if (actualType == FUNCI || actualType == FUNCR)    { funcAsRefError();   }
+                            if (lists[listDepth-1]->items[i].rawNum)           { rawNumAsRefError(); }
+                          }
                         }
                       }
                       lists = freeList(lists, --listDepth);
@@ -539,8 +548,8 @@ Relop              : RELOPLT   { $$ = "<" ; }
                    | RELOPGT   { $$ = ">" ; }
                    ;
 
-ArithExprList      : ArithExpr  { addArithExpr(lists, listDepth-1, $1.type, $1.val, $1.lower, $1.upper); }
-                   | ArithExprList ',' ArithExpr { addArithExpr(lists, listDepth-1, $3.type, $3.val, $3.lower, $3.upper); }
+ArithExprList      : ArithExpr  { addArithExpr(lists, listDepth-1, $1.type, $1.val, $1.lower, $1.upper, $1.rawNum); }
+                   | ArithExprList ',' ArithExpr { addArithExpr(lists, listDepth-1, $3.type, $3.val, $3.lower, $3.upper, $3.rawNum); }
                    ;
 
 ArithExpr          : IDENTIFIER {
@@ -633,9 +642,11 @@ ArithExpr          : IDENTIFIER {
                               ArithExprItem a = lists[listDepth-1]->items[i];
                               wrongRangeError($1, i, e.lower, e.upper, a.lower, a.upper);
                             }
-                            int isRef = maps[scopeFound]->symbols[idx].params[i].ref;
-                            if (isRef && (actualType == REALCON || actualType == INTCON)) { constAsRefError(); }
-                            if (isRef && (actualType == FUNCI || actualType == FUNCR)) { funcAsRefError(); }
+                            if (maps[scopeFound]->symbols[idx].params[i].ref) {
+                              if (actualType == REALCON || actualType == INTCON) { constAsRefError();  }
+                              if (actualType == FUNCI   || actualType == FUNCR)  { funcAsRefError();   }
+                              if (lists[listDepth-1]->items[i].rawNum)           { rawNumAsRefError(); }
+                            }
                           }
                         }
                         $$.type = typeFromStr(maps[scopeFound], $1);
@@ -643,8 +654,8 @@ ArithExpr          : IDENTIFIER {
                       lists = freeList(lists, --listDepth);
                       free($1);
                      }
-                   | INTNUMBER   { $$.type = INTNUM;  $$.val = $1; $$.valKnown = 1; }
-                   | REALNUMBER  { $$.type = REALNUM; $$.val = $1; $$.valKnown = 1; }
+                   | INTNUMBER   { $$.type = INTNUM;  $$.val = $1; $$.valKnown = 1; $$.rawNum = 1; }
+                   | REALNUMBER  { $$.type = REALNUM; $$.val = $1; $$.valKnown = 1; $$.rawNum = 1; }
                    | ArithExpr '+' ArithExpr  {
                       if (!typeCanBeRhs($1.type)) {
                         noValueError($1.type);
@@ -652,7 +663,7 @@ ArithExpr          : IDENTIFIER {
                       if (!typeCanBeRhs($3.type)) {
                         noValueError($3.type);
                       }
-                      $$.valKnown = 0; $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM;
+                      $$.rawNum = 1; $$.valKnown = 0; $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM;
                       if ($1.valKnown && $3.valKnown) {
                         $$.valKnown = 1; $$.val = $1.val + $3.val;
                       }
@@ -664,7 +675,7 @@ ArithExpr          : IDENTIFIER {
                       if (!typeCanBeRhs($3.type)) {
                         noValueError($3.type);
                       }
-                      $$.valKnown = 0; $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM;
+                      $$.rawNum = 1; $$.valKnown = 0; $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM;
                       if ($1.valKnown && $3.valKnown) {
                         $$.valKnown = 1; $$.val = $1.val - $3.val;
                       }
@@ -676,7 +687,7 @@ ArithExpr          : IDENTIFIER {
                       if (!typeCanBeRhs($3.type)) {
                         noValueError($3.type);
                       }
-                      $$.valKnown = 0; $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM;
+                      $$.rawNum = 1; $$.valKnown = 0; $$.type = isRealType($1.type) || isRealType($3.type) ? REALNUM : INTNUM;
                       if ($1.valKnown && $3.valKnown) {
                         $$.valKnown = 1; $$.val = $1.val * $3.val;
                       }
@@ -688,7 +699,7 @@ ArithExpr          : IDENTIFIER {
                       if (!typeCanBeRhs($3.type)) {
                         noValueError($3.type);
                       }
-                      $$.valKnown = 0; $$.type = REALNUM;
+                      $$.rawNum = 1; $$.valKnown = 0; $$.type = REALNUM;
                       if ($3.valKnown && $3.val == 0) {
                         divisionByZeroError();
                       } else if ($1.valKnown && $3.valKnown) {
@@ -707,7 +718,7 @@ ArithExpr          : IDENTIFIER {
                       } else if (!isIntegerType($3.type)) {
                         divError($3.type);
                       }
-                      $$.valKnown = 0; $$.type = INTNUM;
+                      $$.rawNum = 1; $$.valKnown = 0; $$.type = INTNUM;
                       if (isIntegerType($1.type) && isIntegerType($3.type)) {
                         if ($3.valKnown && $3.val == 0) {
                           divisionByZeroError();
@@ -728,7 +739,7 @@ ArithExpr          : IDENTIFIER {
                       } else if (!isIntegerType($3.type)) {
                         moduloError($3.type);
                       }
-                      $$.valKnown = 0; $$.type = INTNUM;
+                      $$.rawNum = 1; $$.valKnown = 0; $$.type = INTNUM;
                       if (isIntegerType($1.type) && isIntegerType($3.type)) {
                         if ($3.valKnown && $3.val == 0) {
                           modByZeroError();
@@ -739,7 +750,7 @@ ArithExpr          : IDENTIFIER {
                       }
                      }
                    | '-' ArithExpr { 
-                      $$.type = $2.type; $$.valKnown = 0;
+                      $$.rawNum = 1; $$.type = $2.type; $$.valKnown = 0;
                       if (!typeCanBeRhs($2.type)) {
                         noValueError($2.type);
                       } else if ($2.valKnown) { 
@@ -747,7 +758,7 @@ ArithExpr          : IDENTIFIER {
                       }
                      }
                    | '(' ArithExpr ')' { 
-                      $$.type = $2.type; $$.valKnown = 0;
+                      $$.rawNum = 1; $$.type = $2.type; $$.valKnown = 0;
                       if (!typeCanBeRhs($2.type)) {
                         noValueError($2.type);
                       } else if ($2.valKnown) { 

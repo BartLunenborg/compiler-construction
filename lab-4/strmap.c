@@ -296,12 +296,12 @@ ArithExprList **freeList(ArithExprList **lists, int len) {
   }
 }
 
-void addArithExpr(ArithExprList **lists, int idx, Type type, double val, int lower, int upper) {
+void addArithExpr(ArithExprList **lists, int idx, Type type, double val, int lower, int upper, int rawNum) {
   lists[idx]->len++;
   lists[idx]->items = realloc(lists[idx]->items, lists[idx]->len * sizeof(ArithExprItem));
-  if (isIntegerType(type)) { lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, (int)val, 0, lower, upper}; 
+  if (isIntegerType(type)) { lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, (int)val, 0, lower, upper, rawNum}; 
   } else {
-    lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, 0, val, lower, upper}; 
+    lists[idx]->items[lists[idx]->len-1] = (ArithExprItem) {type, 0, val, lower, upper, rawNum}; 
   }
 }
 

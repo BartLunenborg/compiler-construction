@@ -25,6 +25,7 @@ typedef struct ArithExprItem {
   double dval;
   int lower;
   int upper;
+  int rawNum;
 } ArithExprItem;
 
 typedef struct ArithExprList {
@@ -136,7 +137,7 @@ int assignTypes(HashMap *map, Type type);
 
 void addParams(HashMap *map, char *func, int vars, Type type, int lower, int upper, int ref);
 
-void addArithExpr(ArithExprList **list, int len, Type type, double val, int lower, int upper);
+void addArithExpr(ArithExprList **list, int len, Type type, double val, int lower, int upper, int rawNum);
 
 ArithExprList **addList(ArithExprList **list, int len);
 

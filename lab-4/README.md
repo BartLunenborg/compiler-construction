@@ -10,6 +10,7 @@
 6.  We don't allow `const` variables to be passed by reference.
 
 # Implemented errors
+The errors are implemented such that the program will always continue parsing unless it encounters a syntax error.
 1.  Redefinition
     - Redefinition errors occur when an `identifier` is introduced that has already been declared in the current scope.
 2.  Undeclared
@@ -59,7 +60,9 @@
     - When a variable declared as `const` is passed by reference we give an error.
 24. Function as ref
     - When a function is passed by reference we give an error.
-25. Return value ignored
+25. Raw numbers as ref
+    - When a raw number is passed by reference we give an error (things such as `a * b` or `arr[5] + 9`).
+26. Return value ignored
     - When a functions is called but the result is not used (function used as procedure).
 
 [^1]: Integer types are integer numbers, but also functions return integers and arrays of integers if one element is selected.
