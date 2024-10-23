@@ -59,6 +59,7 @@ typedef struct Symbol {
   double dval;    /**< Field that can be used for doubles.  */
   int numParams;  /**< The number of parameters in params.  */
   Param *params;  /**< Array of parameters (for functions). */
+  int isParam;
   int isRef;
 } Symbol;
 
@@ -132,7 +133,7 @@ int typeCanBeRhs(Type type);
 
 void setVal(HashMap *map, int idx, double val);
 
-int assignArrayTypes(HashMap *map, Type type, int lower, int upper);
+int assignArrayTypes(HashMap *map, Type type, int lower, int upper, int isParam);
 
 int isArrayType(HashMap *map, int idx);
 
@@ -140,7 +141,7 @@ int canBeLhs(HashMap *map, int idx, int scope);
 
 int isFuncType(HashMap *map, int idx);
 
-int assignTypes(HashMap *map, Type type, int isRef);
+int assignTypes(HashMap *map, Type type, int isRef, int isParam);
 
 void addParams(HashMap *map, char *func, int vars, Type type, int lower, int upper, int ref);
 

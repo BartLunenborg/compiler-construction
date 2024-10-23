@@ -197,7 +197,7 @@ int isFuncType(HashMap *map, int idx) {
   return type == FUNCI || type == FUNCR || type == PROC;
 }
 
-int assignArrayTypes(HashMap *map, Type type, int lower, int upper) {
+int assignArrayTypes(HashMap *map, Type type, int lower, int upper, int isParam) {
   int changed = 0;
   type = type == REALNUM ? ARROR : ARROI;
   for (int i = 0; i < map->capacity; i++) {
@@ -206,18 +206,20 @@ int assignArrayTypes(HashMap *map, Type type, int lower, int upper) {
       map->symbols[i].type = type;
       map->symbols[i].lower = lower;
       map->symbols[i].upper = upper;
+      map->symbols[i].isParam = isParam;
     }
   }
   return changed;
 }
 
-int assignTypes(HashMap *map, Type type, int isRef) {
+int assignTypes(HashMap *map, Type type, int isRef, int isParam) {
   int changed = 0;
   for (int i = 0; i < map->capacity; i++) {
     if (map->symbols[i].str && map->symbols[i].type == NONE) {
       changed++;
       map->symbols[i].type = type;
       map->symbols[i].isRef = isRef;
+      map->symbols[i].isParam = isParam;
     }
   }
   return changed;
