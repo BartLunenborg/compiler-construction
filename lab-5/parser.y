@@ -157,7 +157,6 @@ VarDecl            : VarDecl VAR IdentifierList ':' TypeSpec ';' {
                         for (int i = 0; i < map->capacity; i++) {
                           if (map->symbols[i].str && map->symbols[i].type == NONE) {
                             indent(); int n = $5.upper - $5.lower + 1;
-                            //fprintf(output, "%s *%s = calloc(%d, sizeof(%s));\n", type, map->symbols[i].str, n, type);
                             fprintf(output, "%s %s[%d] = {0};\n", type, map->symbols[i].str, n);
                           }
                         }
@@ -399,23 +398,25 @@ ProcedureCall      : IDENTIFIER {
                       int idx = lookupStringTable(maps[0], $1);
                       int expected = expectedNumArguments(maps[0], $1);
                       for (int i = 0; i < expected; i++) {
-                        int expectedType = maps[0]->symbols[idx].params[i].type;
-                        int actualType = lists[listDepth-1]->items[i].type;
-                        //if (!maps[0]->symbols[idx].params[i].ref) {
-                          fprintf(output, "%s", lists[listDepth-1]->buffs[i].buff);
-                        //}
+                        fprintf(output, "%s", lists[listDepth-1]->buffs[i].buff);
                       }
                       fprintf(output, "  f_%s(", $1);
                       if (maps[0]->symbols[idx].params[0].ref) {
-                        fprintf(output, "%s", lists[listDepth-1]->buffs[0].asRef);
+                        if (maps[0]->symbols[idx].params[0].type == ARROR || maps[0]->symbols[idx].params[0].type == ARROI) {
+                          fprintf(output, "%s", lists[listDepth-1]->buffs[0].asRef);
+                        } else {
+                          fprintf(output, "&%s", lists[listDepth-1]->buffs[0].asRef);
+                        }
                       } else {
                         fprintf(output, "%s", lists[listDepth-1]->buffs[0].raw);
                       }
                       for (int i = 1; i < expected; i++) {
-                        int expectedType = maps[0]->symbols[idx].params[i].type;
-                        int actualType = lists[listDepth-1]->items[i].type;
                         if (maps[0]->symbols[idx].params[i].ref) {
-                          fprintf(output, ", %s", lists[listDepth-1]->buffs[i].asRef);
+                          if (maps[0]->symbols[idx].params[i].type == ARROR || maps[0]->symbols[idx].params[i].type == ARROI) {
+                            fprintf(output, ", %s", lists[listDepth-1]->buffs[i].asRef);
+                          } else {
+                            fprintf(output, ", &%s", lists[listDepth-1]->buffs[i].asRef);
+                          }
                         } else {
                           fprintf(output, ", %s", lists[listDepth-1]->buffs[i].raw);
                         }
@@ -428,7 +429,6 @@ ProcedureCall      : IDENTIFIER {
                    | WRITELN { lists = addList(lists, ++listDepth); } '(' ArithExprList ')' {
                       int len = lists[listDepth-1]->len;
                       for (int i = 0; i < len; i++) {
-                        //int type = lists[listDepth-1]->items[i].type;
                         fprintf(output, "%s", lists[listDepth-1]->buffs[i].buff);
                       }
                       fprintf(output, "  printf(\"");
@@ -498,11 +498,7 @@ ArithExpr          : IDENTIFIER {
                           lists[listDepth-1]->buffs[i].buffI = strlen(lists[listDepth-1]->buffs[i].buff);
                           snprintf(lists[listDepth-1]->buffs[i].raw, buffMax, "_t%d", tempVarCounter);
                         }
-                        if (isArrayType(maps[scopeFound], idx)) {
-                          snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "%s", $1); tempVarCounter++;
-                        } else {
-                          snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "&%s", $1); tempVarCounter++;
-                        }
+                        snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "%s", $1); tempVarCounter++;
                       }
                       $$.type = typeFromIdx(maps[scopeFound], idx);
                       free($1);
@@ -532,7 +528,7 @@ ArithExpr          : IDENTIFIER {
                         snprintf(lists[listDepth-1]->buffs[i].buff + lists[listDepth-1]->buffs[i].buffI, buffMax - lists[listDepth-1]->buffs[i].buffI, "%s_t%d = *_t%d;\n", t, tempVarCounter, tempVarCounter-1);
                         lists[listDepth-1]->buffs[i].buffI = strlen(lists[listDepth-1]->buffs[i].buff);
                         snprintf(lists[listDepth-1]->buffs[i].raw, buffMax, "_t%d", tempVarCounter);
-                        snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "&%s[_t%d]", $1, $3.t); tempVarCounter++;
+                        snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "%s[_t%d]", $1, $3.t); tempVarCounter++;
                       }
                       $$.type = typeFromArr(typeFromIdx(maps[scopeFound], idx));
                       free($1);
@@ -542,28 +538,14 @@ ArithExpr          : IDENTIFIER {
                       int idx = lookupStringTable(maps[scope], $1);
                       int scopeFound = idx == -1 ? 0 : scope;
                       idx = lookupStringTable(maps[scopeFound], $1);
-                      // TODO: Fix this
                       char *t = typeFromIdx(maps[scopeFound], idx) == ARROI ? "int " : "double ";
-                      int lower = maps[scopeFound]->symbols[idx].lower;
-                      if (listDepth == 0) {  // NOTE: I don't think we will ever enter this if statement
-                        printf("Why am I here?\n");
-                        //indent();
-                        //fprintf(output, "_t%d = _t%d - %d;\n", $3.t, $3.t, lower); indent(); 
-                        //fprintf(output, "%s*_t%d = %s;\n", t, tempVarCounter++, $1); indent(); 
-                        //fprintf(output, "_t%d = _t%d + _t%d;\n", tempVarCounter-1, tempVarCounter-1, $3.t); indent(); 
-                        //fprintf(output, "%s_t%d = *_t%d;\n", t, tempVarCounter, tempVarCounter-1);
-                        //tempVarCounter++;
-                      } else {
-                        int i = lists[listDepth-1]->len;
-                        int lower = maps[scopeFound]->symbols[idx].lower; int upper = maps[scopeFound]->symbols[idx].upper;
-                        char *func = maps[scopeFound]->symbols[idx].type == ARROR ? "copyDoubleArr" : "copyIntArr";
-                        snprintf(lists[listDepth-1]->buffs[i].buff + lists[listDepth-1]->buffs[i].buffI, buffMax - lists[listDepth-1]->buffs[i].buffI, "// skip\n");
-                        lists[listDepth-1]->buffs[i].buffI = strlen(lists[listDepth-1]->buffs[i].buff);
-                        snprintf(lists[listDepth-1]->buffs[i].raw, buffMax, "%s(%s, %d, %d, %d, %d)", func, $1, lower, upper, $3, $5);
-                        snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "%s+%d", $1, lower); tempVarCounter++;
-                      }
-
-
+                      int i = lists[listDepth-1]->len;
+                      int lower = maps[scopeFound]->symbols[idx].lower; int upper = maps[scopeFound]->symbols[idx].upper;
+                      char *func = maps[scopeFound]->symbols[idx].type == ARROR ? "copyDoubleArr" : "copyIntArr";
+                      snprintf(lists[listDepth-1]->buffs[i].buff + lists[listDepth-1]->buffs[i].buffI, buffMax - lists[listDepth-1]->buffs[i].buffI, "// skip\n");
+                      lists[listDepth-1]->buffs[i].buffI = strlen(lists[listDepth-1]->buffs[i].buff);
+                      snprintf(lists[listDepth-1]->buffs[i].raw, buffMax, "%s(%s, %d, %d, %d, %d)", func, $1, lower, upper, $3, $5);
+                      snprintf(lists[listDepth-1]->buffs[i].asRef, buffMax, "%s+%d", $1, lower); tempVarCounter++;
                       $$.type = typeFromStr(maps[scopeFound], $1);
                       $$.lower = $3; $$.upper = $5;
                       free($1);
@@ -576,12 +558,8 @@ ArithExpr          : IDENTIFIER {
                       if (listDepth > 1) {
                         int j = lists[listDepth-2]->len;
                         for (int i = 0; i < expected; i++) {
-                          int expectedType = maps[0]->symbols[idx].params[i].type;
-                          int actualType = lists[listDepth-1]->items[i].type;
-                          //if (!maps[0]->symbols[idx].params[i].ref) {
-                            snprintf(lists[listDepth-2]->buffs[j].buff + lists[listDepth-2]->buffs[j].buffI, buffMax - lists[listDepth-2]->buffs[j].buffI, "%s", lists[listDepth-1]->buffs[i].buff);
-                            lists[listDepth-2]->buffs[j].buffI = strlen(lists[listDepth-2]->buffs[j].buff);
-                          //}
+                          snprintf(lists[listDepth-2]->buffs[j].buff + lists[listDepth-2]->buffs[j].buffI, buffMax - lists[listDepth-2]->buffs[j].buffI, "%s", lists[listDepth-1]->buffs[i].buff);
+                          lists[listDepth-2]->buffs[j].buffI = strlen(lists[listDepth-2]->buffs[j].buff);
                         }
                         snprintf(lists[listDepth-2]->buffs[j].buff + lists[listDepth-2]->buffs[j].buffI, buffMax - lists[listDepth-2]->buffs[j].buffI, "%s_t%d = f_%s(", t, tempVarCounter++, $1);
                         lists[listDepth-2]->buffs[j].buffI = strlen(lists[listDepth-2]->buffs[j].buff);
@@ -598,8 +576,6 @@ ArithExpr          : IDENTIFIER {
                           lists[listDepth-2]->buffs[j].buffI = strlen(lists[listDepth-2]->buffs[j].buff);
                         }
                         for (int i = 1; i < expected; i++) {
-                          int expectedType = maps[0]->symbols[idx].params[i].type;
-                          int actualType = lists[listDepth-1]->items[i].type;
                           if (maps[0]->symbols[idx].params[i].ref) {
                             if (maps[0]->symbols[idx].params[0].type == ARROR || maps[0]->symbols[idx].params[0].type == ARROI) {
                               snprintf(lists[listDepth-2]->buffs[j].buff + lists[listDepth-2]->buffs[j].buffI, buffMax - lists[listDepth-2]->buffs[j].buffI,  ", %s", lists[listDepth-1]->buffs[i].asRef);
@@ -618,8 +594,6 @@ ArithExpr          : IDENTIFIER {
                         snprintf(lists[listDepth-2]->buffs[j].raw, buffMax,  "_t%d", tempVarCounter-1);
                       } else {
                         for (int i = 0; i < expected; i++) {
-                          int expectedType = maps[0]->symbols[idx].params[i].type;
-                          int actualType = lists[listDepth-1]->items[i].type;
                           if (!maps[0]->symbols[idx].params[i].ref) {
                             fprintf(output, "%s", lists[listDepth-1]->buffs[i].buff);
                           }
@@ -635,8 +609,6 @@ ArithExpr          : IDENTIFIER {
                           fprintf(output, "%s", lists[listDepth-1]->buffs[0].raw);
                         }
                         for (int i = 1; i < expected; i++) {
-                          int expectedType = maps[0]->symbols[idx].params[i].type;
-                          int actualType = lists[listDepth-1]->items[i].type;
                           if (maps[0]->symbols[idx].params[i].ref) {
                             if (maps[0]->symbols[idx].params[i].type == ARROR || maps[0]->symbols[idx].params[i].type == ARROI) {
                               fprintf(output, ", %s", lists[listDepth-1]->buffs[i].asRef);

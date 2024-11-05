@@ -99,23 +99,9 @@ int lookupStringTable(HashMap *map, char *str);
 int insertOrRetrieveStringTable(HashMap *map, char *str);
 
 
-/**
- * Deletes an entry from the hash map by setting the tombstone flag.
- * @param map  The hash map.
- * @param str  The string to delete.
- */
-void deleteFromStringTable(HashMap *map, char *str);
-
-/**
- * Shows the entire string map on standard output.
- */
-void showStringTable(HashMap *map);
-
 int expectedNumArguments(HashMap *map, char *str);
 
 void setType(HashMap *map, int idx, Type type);
-
-Type isConstantType(HashMap *map, int idx);
 
 int isIntegerType(Type type);
 
@@ -127,19 +113,11 @@ int typeFromStr(HashMap *map, char *str);
 
 int typeFromArr(Type type);
 
-char *typeAsString(Type type);
-
-int typeCanBeRhs(Type type);
-
 void setVal(HashMap *map, int idx, double val);
 
 int assignArrayTypes(HashMap *map, Type type, int lower, int upper, int isParam);
 
 int isArrayType(HashMap *map, int idx);
-
-int canBeLhs(HashMap *map, int idx, int scope);
-
-int isFuncType(HashMap *map, int idx);
 
 int assignTypes(HashMap *map, Type type, int isRef, int isParam);
 
@@ -151,19 +129,9 @@ ArithExprList **addList(ArithExprList **list, int len);
 
 ArithExprList **freeList(ArithExprList **list, int len);
 
-int isValidParamType(Param e, ArithExprItem a);
-
-int typeGetsTruncated(Param e, ArithExprItem a);
-
-int isValidArraySlice(Param e, ArithExprItem a);
-
-int isInRange(HashMap *map, int idx, int i);
-
 void copyToLocalScope(HashMap *global, HashMap *local, char *str);
 
-const char *arrBoundsAsString(HashMap *map, int idx);
 
-void showList(ArithExprItem *list, int size);
 
 /**
  * Deallocates all memory that is used by the hash map.
